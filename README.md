@@ -96,12 +96,15 @@ VITE_SUPABASE_ANON_KEY=sua_chave_anon
 ---
 
 ## 🗄️ Estrutura do Banco de Dados
-patients          → Cadastro de pacientes
-anamnesis_forms   → Fichas de anamnese com token único
-sessions          → Histórico de sessões por paciente
-session_photos    → Fotos antes/depois por sessão
-procedures        → Procedimentos oferecidos pela clínica
-exams             → Exames anexados por paciente
+
+| Tabela | Descrição |
+|---|---|
+| `patients` | Cadastro de pacientes |
+| `anamnesis_forms` | Fichas de anamnese com token único |
+| `sessions` | Histórico de sessões por paciente |
+| `session_photos` | Fotos antes/depois por sessão |
+| `procedures` | Procedimentos oferecidos pela clínica |
+| `exams` | Exames anexados por paciente |
 
 ---
 
