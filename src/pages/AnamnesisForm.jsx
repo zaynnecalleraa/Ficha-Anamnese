@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const SIM_NAO = ['sim', 'não']
@@ -49,6 +49,9 @@ function TextInput({ value, onChange, placeholder }) {
 
 export default function AnamnesisForm() {
   const { token } = useParams()
+  const [searchParams] = useSearchParams()
+  const isAdmin = searchParams.get('modo') === 'admin'
+
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitted, setSubmitted] = useState(false)
@@ -69,8 +72,19 @@ export default function AnamnesisForm() {
 
     if (data) {
       setForm(data)
-      if (data.status === 'completed') setSubmitted(true)
+      if (data.status === 'completed' && !isAdmin) setSubmitted(true)
       if (data.answers) setAnswers(data.answers)
+      // pre-fill personal data if already filled
+      setPersonal({
+        full_name: data.full_name || '',
+        birth_date: data.birth_date || '',
+        address: data.address || '',
+        cpf: data.cpf || '',
+        profession: data.profession || '',
+        marital_status: data.marital_status || '',
+        email: data.email || '',
+        phone: data.phone || '',
+      })
     }
     setLoading(false)
   }
@@ -107,11 +121,12 @@ export default function AnamnesisForm() {
   setSaving(false)
   setSubmitted(true)
 
-  // Aviso WhatsApp para a clínica
-  const nome = personal.full_name || 'Paciente'
-  const mensagem = `✅ *Nova ficha preenchida!*\n\nA paciente *${nome}* acabou de preencher a ficha de anamnese.\n\nAcesse o painel para visualizar: ${window.location.origin}`
-  const whatsappUrl = `https://wa.me/5592993242367?text=${encodeURIComponent(mensagem)}`
-  window.open(whatsappUrl, '_blank')
+  if (!isAdmin) {
+    const nome = personal.full_name || 'Paciente'
+    const mensagem = `✅ *Nova ficha preenchida!*\n\nA paciente *${nome}* acabou de preencher a ficha de anamnese.\n\nAcesse o painel para visualizar: ${window.location.origin}`
+    const whatsappUrl = `https://wa.me/5592993242367?text=${encodeURIComponent(mensagem)}`
+    window.open(whatsappUrl, '_blank')
+  }
 }
 
   if (loading) return (
@@ -130,8 +145,23 @@ export default function AnamnesisForm() {
     <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="text-center">
         <div className="w-16 h-16 rounded-full bg-yellow-50 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
-        <h2 className="font-display text-2xl text-yellow-600 mb-2">Ficha enviada!</h2>
-        <p className="text-gray-400 text-sm">Obrigada! Suas informações foram salvas.<br />Até breve na Callera Clinic. 🌿</p>
+        {isAdmin ? (
+          <>
+            <h2 className="font-display text-2xl text-yellow-600 mb-2">Ficha salva!</h2>
+            <p className="text-gray-400 text-sm">As informações foram atualizadas com sucesso.</p>
+            <button
+              onClick={() => window.close()}
+              className="mt-4 text-xs text-gray-400 hover:text-yellow-600 transition underline"
+            >
+              Fechar aba
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="font-display text-2xl text-yellow-600 mb-2">Ficha enviada!</h2>
+            <p className="text-gray-400 text-sm">Obrigada! Suas informações foram salvas.<br />Até breve na Callera Clinic. 🌿</p>
+          </>
+        )}
       </div>
     </div>
   )

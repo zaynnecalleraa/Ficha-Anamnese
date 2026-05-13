@@ -176,6 +176,19 @@ export default function PatientDetail() {
     window.open(`/imprimir/${anamnesisForm.token}`, '_blank')
   }
 
+  async function handleReopenForm() {
+    if (!confirm('Reabrir a ficha para que a paciente preencha novamente pelo link?')) return
+    await supabase
+      .from('anamnesis_forms')
+      .update({ status: 'pending', submitted_at: null })
+      .eq('patient_id', id)
+    fetchAll()
+  }
+
+  function handleFillAsAdmin() {
+    window.open(`/ficha/${anamnesisForm.token}?modo=admin`, '_blank')
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-yellow-600 font-display text-xl">Carregando...</p>
@@ -343,13 +356,29 @@ export default function PatientDetail() {
                 </div>
               )}
 
-              <button onClick={handlePrint}
-                className="flex items-center gap-2 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition mt-2">
-                <Printer size={15} /> Imprimir ficha
-              </button>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button onClick={handlePrint}
+                  className="flex items-center gap-2 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition">
+                  <Printer size={15} /> Imprimir ficha
+                </button>
+                <button onClick={handleFillAsAdmin}
+                  className="flex items-center gap-2 text-sm border border-blue-200 text-blue-500 hover:bg-blue-50 px-4 py-2 rounded-lg transition">
+                  <Pencil size={15} /> Editar ficha
+                </button>
+                <button onClick={handleReopenForm}
+                  className="flex items-center gap-2 text-sm border border-gray-200 text-gray-400 hover:bg-gray-50 px-4 py-2 rounded-lg transition">
+                  Reabrir para paciente
+                </button>
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-400">A paciente ainda não preencheu a ficha.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-400">A paciente ainda não preencheu a ficha.</p>
+              <button onClick={handleFillAsAdmin}
+                className="flex items-center gap-2 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition">
+                <Pencil size={15} /> Preencher ficha agora
+              </button>
+            </div>
           )}
         </div>
 
