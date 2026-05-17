@@ -48,7 +48,6 @@ Antes do sistema, as fichas eram preenchidas manualmente no consultório, consum
 | [React Router](https://reactrouter.com) | Navegação |
 | [Supabase](https://supabase.com) | Banco de dados, autenticação e storage |
 | [Lucide React](https://lucide.dev) | Ícones |
-| [Vercel](https://vercel.com) | Deploy e hospedagem |
 
 ---
 
