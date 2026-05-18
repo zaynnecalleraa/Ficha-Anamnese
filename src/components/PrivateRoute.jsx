@@ -9,6 +9,12 @@ export default function PrivateRoute({ children }) {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
     })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   if (session === undefined) return (
