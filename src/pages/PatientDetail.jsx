@@ -26,6 +26,7 @@ export default function PatientDetail() {
   const [savingSession, setSavingSession] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [uploadingExam, setUploadingExam] = useState(false)
+  const [examError, setExamError] = useState(null)
   const [expandedSession, setExpandedSession] = useState(null)
   const [sessionPhotosList, setSessionPhotosList] = useState({})
 
@@ -157,18 +158,33 @@ export default function PatientDetail() {
   async function handleExamUpload(e) {
     const file = e.target.files[0]
     if (!file) return
+    e.target.value = ''
     setUploadingExam(true)
+    setExamError(null)
+
     const fileName = `${id}/${Date.now()}_${file.name}`
-    const { error } = await supabase.storage.from('exams').upload(fileName, file)
-    if (!error) {
-      const { data: urlData } = supabase.storage.from('exams').getPublicUrl(fileName)
-      await supabase.from('exams').insert({
-        patient_id: id,
-        file_url: urlData.publicUrl,
-        file_name: file.name,
-      })
+    const { error: storageError } = await supabase.storage.from('exams').upload(fileName, file)
+
+    if (storageError) {
+      setExamError(`Erro no upload: ${storageError.message}`)
+      setUploadingExam(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from('exams').getPublicUrl(fileName)
+    const { error: dbError } = await supabase.from('exams').insert({
+      patient_id: id,
+      file_url: urlData.publicUrl,
+      file_name: file.name,
+      uploaded_at: new Date().toISOString(),
+    })
+
+    if (dbError) {
+      setExamError(`Erro ao salvar: ${dbError.message}`)
+    } else {
       fetchAll()
     }
+
     setUploadingExam(false)
   }
 
@@ -469,12 +485,19 @@ export default function PatientDetail() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-lg text-gray-700">Exames</h3>
-            <label className="flex items-center gap-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg transition cursor-pointer">
+            <label className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition cursor-pointer text-white ${uploadingExam ? 'bg-yellow-400 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
               <Upload size={13} />
               {uploadingExam ? 'Enviando...' : 'Anexar exame'}
-              <input type="file" className="hidden" onChange={handleExamUpload} accept=".pdf,.jpg,.jpeg,.png" />
+              <input type="file" className="hidden" onChange={handleExamUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={uploadingExam} />
             </label>
           </div>
+
+          {examError && (
+            <div className="mb-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-4 py-3 flex items-center justify-between">
+              <span>{examError}</span>
+              <button onClick={() => setExamError(null)} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+            </div>
+          )}
 
           {exams.length === 0 ? (
             <p className="text-sm text-gray-300">Nenhum exame anexado ainda.</p>

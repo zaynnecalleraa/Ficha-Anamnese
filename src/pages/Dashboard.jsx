@@ -1,42 +1,84 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { UserPlus, LogOut, User, Link, ChevronRight, Settings, Search } from 'lucide-react'
+import { UserPlus, LogOut, User, Link, ChevronRight, Settings, Search, Trash2, ArrowUpDown } from 'lucide-react'
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Mais recente' },
+  { value: 'oldest', label: 'Mais antigo' },
+  { value: 'az', label: 'A → Z' },
+  { value: 'za', label: 'Z → A' },
+]
+
+function sortPatients(list, order) {
+  const copy = [...list]
+  switch (order) {
+    case 'oldest': return copy.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    case 'az': return copy.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+    case 'za': return copy.sort((a, b) => b.name.localeCompare(a.name, 'pt-BR'))
+    default: return copy.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  }
+}
 
 export default function Dashboard() {
   const [patients, setPatients] = useState([])
   const [filtered, setFiltered] = useState([])
   const [search, setSearch] = useState('')
+  const [sortOrder, setSortOrder] = useState('newest')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', email: '' })
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     fetchPatients()
   }, [])
 
+  // Real-time subscription for anamnesis status updates
   useEffect(() => {
-    if (search.trim() === '') {
-      setFiltered(patients)
-    } else {
+    const channel = supabase
+      .channel('anamnesis-status-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'anamnesis_forms' },
+        (payload) => {
+          setPatients(prev => prev.map(p =>
+            p.id === payload.new.patient_id
+              ? { ...p, anamnesis_status: payload.new.status }
+              : p
+          ))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  useEffect(() => {
+    let result = patients
+
+    if (search.trim()) {
       const q = search.toLowerCase()
-      setFiltered(patients.filter(p =>
+      result = result.filter(p =>
         p.name.toLowerCase().includes(q) ||
         (p.phone && p.phone.includes(q)) ||
         (p.email && p.email.toLowerCase().includes(q))
-      ))
+      )
     }
-  }, [search, patients])
+
+    setFiltered(sortPatients(result, sortOrder))
+  }, [search, patients, sortOrder])
 
   async function fetchPatients() {
+    setLoading(true)
     const { data: patientsData } = await supabase
       .from('patients')
       .select('*')
-      .order('created_at', { ascending: false })
 
     if (!patientsData) { setLoading(false); return }
 
@@ -52,7 +94,6 @@ export default function Dashboard() {
     )
 
     setPatients(patientsWithStatus)
-    setFiltered(patientsWithStatus)
     setLoading(false)
   }
 
@@ -110,6 +151,29 @@ export default function Dashboard() {
     fetchPatients()
   }
 
+  async function handleDeletePatient(patientId) {
+    setDeleting(true)
+
+    const { data: sessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('patient_id', patientId)
+
+    if (sessions?.length) {
+      const sessionIds = sessions.map(s => s.id)
+      await supabase.from('session_photos').delete().in('session_id', sessionIds)
+      await supabase.from('sessions').delete().eq('patient_id', patientId)
+    }
+
+    await supabase.from('exams').delete().eq('patient_id', patientId)
+    await supabase.from('anamnesis_forms').delete().eq('patient_id', patientId)
+    await supabase.from('patients').delete().eq('id', patientId)
+
+    setDeleteConfirm(null)
+    setDeleting(false)
+    fetchPatients()
+  }
+
   async function copyAnamnesisLink(patientId) {
     const { data } = await supabase
       .from('anamnesis_forms')
@@ -123,6 +187,8 @@ export default function Dashboard() {
       alert('Link copiado! Envie para a paciente.')
     }
   }
+
+  const patientToDelete = deleteConfirm ? patients.find(p => p.id === deleteConfirm) : null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -165,24 +231,39 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Busca */}
-        <div className="relative mb-6">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nome, telefone ou e-mail..."
-            className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition bg-white shadow-sm"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+        {/* Busca + Ordenação */}
+        <div className="flex gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nome, telefone ou e-mail..."
+              className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:border-yellow-400 transition bg-white shadow-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <ArrowUpDown size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <select
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value)}
+              className="appearance-none border border-gray-200 rounded-xl pl-9 pr-8 py-3 text-sm bg-white shadow-sm focus:outline-none focus:border-yellow-400 transition text-gray-600 cursor-pointer"
             >
-              ✕
-            </button>
-          )}
+              {SORT_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▾</span>
+          </div>
         </div>
 
         {/* Lista de pacientes */}
@@ -244,6 +325,13 @@ export default function Dashboard() {
                     Ver
                     <ChevronRight size={13} />
                   </button>
+                  <button
+                    onClick={() => setDeleteConfirm(patient.id)}
+                    className="flex items-center justify-center text-gray-300 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-50"
+                    title="Excluir paciente"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -303,6 +391,39 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar exclusão */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-xl text-center">
+            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} className="text-red-400" />
+            </div>
+            <h3 className="font-display text-xl text-gray-700 mb-2">Excluir paciente?</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Tem certeza que deseja excluir <strong className="text-gray-600">{patientToDelete?.name}</strong>?
+              <br />
+              <span className="text-red-400">Todos os dados, sessões e exames serão apagados permanentemente.</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="flex-1 border border-gray-200 text-gray-400 py-3 rounded-lg text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDeletePatient(deleteConfirm)}
+                disabled={deleting}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg text-sm transition"
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
           </div>
         </div>
       )}

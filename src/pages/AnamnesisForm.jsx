@@ -56,6 +56,7 @@ export default function AnamnesisForm() {
   const [loading, setLoading] = useState(true)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [answers, setAnswers] = useState({})
   const [personal, setPersonal] = useState({})
 
@@ -98,36 +99,43 @@ export default function AnamnesisForm() {
   }
 
   async function handleSubmit(e) {
-  e.preventDefault()
-  setSaving(true)
+    e.preventDefault()
+    setSaving(true)
+    setSaveError(null)
 
-  await supabase
-    .from('anamnesis_forms')
-    .update({
-      status: 'completed',
-      submitted_at: new Date().toISOString(),
-      answers,
-      full_name: personal.full_name,
-      birth_date: personal.birth_date,
-      address: personal.address,
-      cpf: personal.cpf,
-      profession: personal.profession,
-      marital_status: personal.marital_status,
-      email: personal.email,
-      phone: personal.phone,
-    })
-    .eq('token', token)
+    const { error } = await supabase
+      .from('anamnesis_forms')
+      .update({
+        status: 'completed',
+        submitted_at: new Date().toISOString(),
+        answers,
+        full_name: personal.full_name,
+        birth_date: personal.birth_date,
+        address: personal.address,
+        cpf: personal.cpf,
+        profession: personal.profession,
+        marital_status: personal.marital_status,
+        email: personal.email,
+        phone: personal.phone,
+      })
+      .eq('token', token)
 
-  setSaving(false)
-  setSubmitted(true)
+    if (error) {
+      setSaveError('Erro ao enviar a ficha. Verifique sua conexão e tente novamente.')
+      setSaving(false)
+      return
+    }
 
-  if (!isAdmin) {
-    const nome = personal.full_name || 'Paciente'
-    const mensagem = `✅ *Nova ficha preenchida!*\n\nA paciente *${nome}* acabou de preencher a ficha de anamnese.\n\nAcesse o painel para visualizar: ${window.location.origin}`
-    const whatsappUrl = `https://wa.me/5592993242367?text=${encodeURIComponent(mensagem)}`
-    window.open(whatsappUrl, '_blank')
+    setSaving(false)
+    setSubmitted(true)
+
+    if (!isAdmin) {
+      const nome = personal.full_name || 'Paciente'
+      const mensagem = `✅ *Nova ficha preenchida!*\n\nA paciente *${nome}* acabou de preencher a ficha de anamnese.\n\nAcesse o painel para visualizar: ${window.location.origin}`
+      const whatsappUrl = `https://wa.me/5592993242367?text=${encodeURIComponent(mensagem)}`
+      window.open(whatsappUrl, '_blank')
+    }
   }
-}
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -473,6 +481,11 @@ export default function AnamnesisForm() {
 
         {/* Botão enviar */}
         <div className="pt-4 pb-10">
+          {saveError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3">
+              {saveError}
+            </div>
+          )}
           <button
             type="submit"
             disabled={saving}
