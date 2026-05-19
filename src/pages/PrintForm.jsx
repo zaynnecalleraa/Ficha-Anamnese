@@ -99,9 +99,14 @@ export default function PrintForm() {
         .signature-line hr { width: 260px; border: none; border-top: 1px solid #333; margin-bottom: 6px; }
         .signature-line p { font-size: 10px; color: #555; }
         .date-line { text-align: right; font-size: 10px; color: #555; margin-top: 16px; }
+        @page {
+          margin: 0;
+          size: A4;
+        }
         @media print {
           .no-print { display: none !important; }
           body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          .print-container { padding: 28px 36px; }
         }
       `}</style>
 
