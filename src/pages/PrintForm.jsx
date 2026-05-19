@@ -2,10 +2,38 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+               'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+
+const BLANK_DIA = '_____'
+const BLANK_MES = '___________________'
+const BLANK_ANO = '_______'
+
+function buildDateLine(parts) {
+  const now = new Date()
+  const dia = parts.dia.show ? (parts.dia.mode === 'auto' ? String(now.getDate()) : BLANK_DIA) : null
+  const mes = parts.mes.show ? (parts.mes.mode === 'auto' ? MESES[now.getMonth()] : BLANK_MES) : null
+  const ano = parts.ano.show ? (parts.ano.mode === 'auto' ? String(now.getFullYear()) : BLANK_ANO) : null
+
+  if (!dia && !mes && !ano) return 'Manaus, _________________________________.'
+  if (dia && mes && ano) return `Manaus, ${dia} de ${mes} de ${ano}.`
+  if (dia && mes)         return `Manaus, ${dia} de ${mes}.`
+  if (mes && ano)         return `Manaus, ${mes} de ${ano}.`
+  if (dia && ano)         return `Manaus, ${dia} de ${ano}.`
+  if (dia)                return `Manaus, ${dia}.`
+  if (mes)                return `Manaus, ${mes}.`
+  return `Manaus, ${ano}.`
+}
+
 export default function PrintForm() {
   const { token } = useParams()
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [dateParts, setDateParts] = useState({
+    dia: { show: true, mode: 'blank' },
+    mes: { show: true, mode: 'blank' },
+    ano: { show: true, mode: 'auto' },
+  })
 
   useEffect(() => {
     fetchForm()
@@ -21,11 +49,9 @@ export default function PrintForm() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    if (!loading && form) {
-      setTimeout(() => window.print(), 800)
-    }
-  }, [loading, form])
+  function setPartProp(part, prop, value) {
+    setDateParts(prev => ({ ...prev, [part]: { ...prev[part], [prop]: value } }))
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -36,8 +62,8 @@ export default function PrintForm() {
   if (!form) return <p className="text-center mt-10 text-red-400">Ficha não encontrada.</p>
 
   const a = form.answers || {}
-
   const simNao = (val) => val || '—'
+  const dateLine = buildDateLine(dateParts)
 
   return (
     <>
@@ -73,22 +99,71 @@ export default function PrintForm() {
         .signature-line hr { width: 260px; border: none; border-top: 1px solid #333; margin-bottom: 6px; }
         .signature-line p { font-size: 10px; color: #555; }
         .date-line { text-align: right; font-size: 10px; color: #555; margin-top: 16px; }
-        .no-print { }
         @media print {
           .no-print { display: none !important; }
           body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         }
       `}</style>
 
-      {/* Botão imprimir (some ao imprimir) */}
-      <div className="no-print fixed top-4 right-4">
+      {/* Painel de controle (some ao imprimir) */}
+      <div className="no-print fixed top-0 left-0 right-0 bg-white border-b border-yellow-200 shadow-sm px-6 py-3 flex items-center gap-6 z-50">
         <button
           onClick={() => window.print()}
-          className="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm shadow"
+          className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition flex-shrink-0"
         >
           🖨️ Imprimir
         </button>
+
+        <div className="h-6 w-px bg-gray-200 flex-shrink-0" />
+
+        {/* Configuração da data */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-xs text-gray-500 font-medium flex-shrink-0">📅 Data na assinatura:</span>
+
+          {[
+            { key: 'dia', label: 'Dia' },
+            { key: 'mes', label: 'Mês' },
+            { key: 'ano', label: 'Ano' },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dateParts[key].show}
+                  onChange={e => setPartProp(key, 'show', e.target.checked)}
+                  className="accent-yellow-500 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-gray-600 font-medium w-6">{label}</span>
+              </label>
+
+              {dateParts[key].show && (
+                <div className="flex border border-gray-200 rounded overflow-hidden text-xs">
+                  <button
+                    onClick={() => setPartProp(key, 'mode', 'auto')}
+                    className={`px-2 py-0.5 transition ${dateParts[key].mode === 'auto' ? 'bg-yellow-500 text-white' : 'text-gray-400 hover:bg-gray-100'}`}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    onClick={() => setPartProp(key, 'mode', 'blank')}
+                    className={`px-2 py-0.5 transition ${dateParts[key].mode === 'blank' ? 'bg-yellow-500 text-white' : 'text-gray-400 hover:bg-gray-100'}`}
+                  >
+                    Vazio
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Preview da data */}
+        <div className="ml-auto flex-shrink-0">
+          <span className="text-xs text-gray-400 italic">{dateLine}</span>
+        </div>
       </div>
+
+      {/* Espaço para o painel fixo não sobrepor o conteúdo */}
+      <div className="no-print h-16" />
 
       <div className="print-container">
 
@@ -165,13 +240,10 @@ export default function PrintForm() {
               </div>
             ))}
 
-            {/* Pressão / Peso / Altura */}
             <div className="question">
               <div className="question-label">33. Pressão arterial / Peso / Altura</div>
               <div className="question-answer">{a.q33_pressao || '—'} / {a.q33_peso || '—'} / {a.q33_altura || '—'}</div>
             </div>
-
-            {/* Procedimento estético */}
             <div className="question">
               <div className="question-label">34. Procedimento estético anterior?</div>
               <div>
@@ -179,26 +251,18 @@ export default function PrintForm() {
                 {a.q34_detail && <div className="question-detail">{a.q34_detail}</div>}
               </div>
             </div>
-
-            {/* Alimentação */}
             <div className="question">
               <div className="question-label">29. Alimentação principal</div>
               <div className="question-answer">{Array.isArray(a.q29) ? a.q29.join(', ') : '—'}</div>
             </div>
-
-            {/* Bebidas */}
             <div className="question">
               <div className="question-label">31. Bebidas de rotina</div>
               <div className="question-answer">{Array.isArray(a.q31) ? a.q31.join(', ') : '—'}</div>
             </div>
-
-            {/* Melhorar */}
             <div className="question">
               <div className="question-label">41. O que gostaria de melhorar?</div>
               <div className="question-answer" style={{ maxWidth: '200px', textAlign: 'right' }}>{a.q41 || '—'}</div>
             </div>
-
-            {/* Info adicional */}
             <div className="question">
               <div className="question-label">42. Informações adicionais</div>
               <div className="question-answer" style={{ maxWidth: '200px', textAlign: 'right' }}>{a.q42 || '—'}</div>
@@ -221,10 +285,8 @@ export default function PrintForm() {
           </div>
         </div>
 
-        {/* Assinatura */}
-        <div className="date-line">
-          Manaus, _______ de _________________________ de 2025.
-        </div>
+        {/* Data e assinatura */}
+        <div className="date-line">{dateLine}</div>
         <div className="signature-area">
           <div className="signature-line">
             <hr />
