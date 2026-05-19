@@ -103,6 +103,19 @@ export default function AnamnesisForm() {
     setSaving(true)
     setSaveError(null)
 
+    // Validação dos campos obrigatórios
+    const camposFaltando = []
+    if (!personal.full_name?.trim()) camposFaltando.push('Nome completo')
+    if (!personal.birth_date) camposFaltando.push('Data de nascimento')
+    if (!personal.phone?.trim()) camposFaltando.push('Celular')
+
+    if (camposFaltando.length > 0) {
+      setSaveError(`Preencha os campos obrigatórios: ${camposFaltando.join(', ')}.`)
+      setSaving(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
     const { error } = await supabase
       .from('anamnesis_forms')
       .update({
@@ -121,7 +134,11 @@ export default function AnamnesisForm() {
       .eq('token', token)
 
     if (error) {
-      setSaveError('Erro ao enviar a ficha. Verifique sua conexão e tente novamente.')
+      if (error.message?.includes('row-level security')) {
+        setSaveError('Erro de permissão no servidor. Entre em contato com a clínica.')
+      } else {
+        setSaveError(`Erro ao enviar: ${error.message}`)
+      }
       setSaving(false)
       return
     }
@@ -189,27 +206,43 @@ export default function AnamnesisForm() {
 
         {/* Dados pessoais */}
         <div className="bg-yellow-50 rounded-xl p-5 space-y-4">
-          <h3 className="font-display text-lg text-yellow-700">Dados Pessoais</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-lg text-yellow-700">Dados Pessoais</h3>
+            <span className="text-xs text-gray-400"><span className="text-red-400">*</span> obrigatório</span>
+          </div>
           {[
-            { key: 'full_name', label: 'Nome completo', type: 'text' },
-            { key: 'birth_date', label: 'Data de nascimento', type: 'date' },
+            { key: 'full_name', label: 'Nome completo', type: 'text', required: true },
+            { key: 'birth_date', label: 'Data de nascimento', type: 'date', required: true },
             { key: 'cpf', label: 'CPF', type: 'text' },
             { key: 'address', label: 'Endereço', type: 'text' },
             { key: 'profession', label: 'Profissão', type: 'text' },
             { key: 'marital_status', label: 'Estado civil', type: 'text' },
             { key: 'email', label: 'E-mail', type: 'email' },
-            { key: 'phone', label: 'Celular', type: 'text' },
-          ].map(f => (
-            <div key={f.key}>
-              <label className="block text-sm text-gray-500 mb-1">{f.label}</label>
-              <input
-                type={f.type}
-                value={personal[f.key] || ''}
-                onChange={e => setP(f.key, e.target.value)}
-                className="w-full border border-yellow-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-500 transition bg-white"
-              />
-            </div>
-          ))}
+            { key: 'phone', label: 'Celular', type: 'text', required: true },
+          ].map(f => {
+            const isEmpty = f.required && !personal[f.key]?.trim()
+            return (
+              <div key={f.key}>
+                <label className="block text-sm text-gray-500 mb-1">
+                  {f.label}
+                  {f.required && <span className="text-red-400 ml-0.5">*</span>}
+                </label>
+                <input
+                  type={f.type}
+                  value={personal[f.key] || ''}
+                  onChange={e => setP(f.key, e.target.value)}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition bg-white ${
+                    saveError && isEmpty
+                      ? 'border-red-300 focus:border-red-400'
+                      : 'border-yellow-200 focus:border-yellow-500'
+                  }`}
+                />
+                {saveError && isEmpty && (
+                  <p className="text-xs text-red-400 mt-1">Campo obrigatório</p>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Perguntas */}
