@@ -415,7 +415,7 @@ export default function AnamnesisForm() {
           </Field>
 
           <Field label="33. Pressão arterial / Peso / Altura">
-            <div className="grid grid-cols-3 gap-2 mt-1">
+            <div className="grid grid-cols-3 gap-2 mt-1 min-w-0">
               <TextInput value={answers.q33_pressao} onChange={v => setA('q33_pressao', v)} placeholder="Pressão" />
               <TextInput value={answers.q33_peso} onChange={v => setA('q33_peso', v)} placeholder="Peso" />
               <TextInput value={answers.q33_altura} onChange={v => setA('q33_altura', v)} placeholder="Altura" />
@@ -487,7 +487,7 @@ export default function AnamnesisForm() {
           </Field>
 
           <Field label="44. Descreva seus cuidados diários com o rosto, pescoço e colo:">
-            <div className="grid grid-cols-2 gap-3 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
               <div>
                 <p className="text-xs text-gray-400 mb-1 text-center">Manhã</p>
                 <textarea

@@ -30,9 +30,7 @@ export default function PatientDetail() {
   const [expandedSession, setExpandedSession] = useState(null)
   const [sessionPhotosList, setSessionPhotosList] = useState({})
 
-  useEffect(() => {
-    fetchAll()
-  }, [id])
+  useEffect(() => { fetchAll() }, [id])
 
   async function fetchAll() {
     const [{ data: pat }, { data: form }, { data: sess }, { data: exam }, { data: proc }] = await Promise.all([
@@ -51,11 +49,7 @@ export default function PatientDetail() {
   }
 
   async function fetchSessionPhotos(sessionId) {
-    const { data } = await supabase
-      .from('session_photos')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('uploaded_at')
+    const { data } = await supabase.from('session_photos').select('*').eq('session_id', sessionId).order('uploaded_at')
     setSessionPhotosList(prev => ({ ...prev, [sessionId]: data || [] }))
   }
 
@@ -92,27 +86,16 @@ export default function PatientDetail() {
   async function handleSaveEdit(e) {
     e.preventDefault()
     setSavingEdit(true)
-
     let photo_url = patient.photo_url
-
     if (photoFile) {
       const fileName = `${Date.now()}_${photoFile.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('patient-photos')
-        .upload(fileName, photoFile)
+      const { error: uploadError } = await supabase.storage.from('patient-photos').upload(fileName, photoFile)
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from('patient-photos').getPublicUrl(fileName)
         photo_url = urlData.publicUrl
       }
     }
-
-    await supabase.from('patients').update({
-      name: editForm.name,
-      phone: editForm.phone,
-      email: editForm.email,
-      photo_url,
-    }).eq('id', id)
-
+    await supabase.from('patients').update({ name: editForm.name, phone: editForm.phone, email: editForm.email, photo_url }).eq('id', id)
     setSavingEdit(false)
     setShowEditModal(false)
     fetchAll()
@@ -121,14 +104,7 @@ export default function PatientDetail() {
   async function handleSaveSession(e) {
     e.preventDefault()
     setSavingSession(true)
-
-    const { data: session } = await supabase
-      .from('sessions')
-      .insert({ ...sessionForm, patient_id: id })
-      .select()
-      .single()
-
-    // Upload das fotos antes/depois
+    const { data: session } = await supabase.from('sessions').insert({ ...sessionForm, patient_id: id }).select().single()
     if (session) {
       for (const type of ['antes', 'depois']) {
         const file = sessionPhotos[type]
@@ -137,16 +113,10 @@ export default function PatientDetail() {
         const { error } = await supabase.storage.from('session-photos').upload(fileName, file)
         if (!error) {
           const { data: urlData } = supabase.storage.from('session-photos').getPublicUrl(fileName)
-          await supabase.from('session_photos').insert({
-            session_id: session.id,
-            file_url: urlData.publicUrl,
-            file_name: file.name,
-            type,
-          })
+          await supabase.from('session_photos').insert({ session_id: session.id, file_url: urlData.publicUrl, file_name: file.name, type })
         }
       }
     }
-
     setSavingSession(false)
     setShowSessionModal(false)
     setSessionForm({ session_date: '', procedure_id: '', how_arrived: '', how_left: '', observations: '' })
@@ -161,49 +131,34 @@ export default function PatientDetail() {
     e.target.value = ''
     setUploadingExam(true)
     setExamError(null)
-
     const fileName = `${id}/${Date.now()}_${file.name}`
     const { error: storageError } = await supabase.storage.from('exams').upload(fileName, file)
-
     if (storageError) {
       setExamError(`Erro no upload: ${storageError.message}`)
       setUploadingExam(false)
       return
     }
-
     const { data: urlData } = supabase.storage.from('exams').getPublicUrl(fileName)
     const { error: dbError } = await supabase.from('exams').insert({
-      patient_id: id,
-      file_url: urlData.publicUrl,
-      file_name: file.name,
-      uploaded_at: new Date().toISOString(),
+      patient_id: id, file_url: urlData.publicUrl, file_name: file.name, uploaded_at: new Date().toISOString(),
     })
-
     if (dbError) {
       setExamError(`Erro ao salvar: ${dbError.message}`)
     } else {
       fetchAll()
     }
-
     setUploadingExam(false)
   }
 
-  function handlePrint() {
-    window.open(`/imprimir/${anamnesisForm.token}`, '_blank')
-  }
+  function handlePrint() { window.open(`/imprimir/${anamnesisForm.token}`, '_blank') }
 
   async function handleReopenForm() {
     if (!confirm('Reabrir a ficha para que a paciente preencha novamente pelo link?')) return
-    await supabase
-      .from('anamnesis_forms')
-      .update({ status: 'pending', submitted_at: null })
-      .eq('patient_id', id)
+    await supabase.from('anamnesis_forms').update({ status: 'pending', submitted_at: null }).eq('patient_id', id)
     fetchAll()
   }
 
-  function handleFillAsAdmin() {
-    window.open(`/ficha/${anamnesisForm.token}?modo=admin`, '_blank')
-  }
+  function handleFillAsAdmin() { window.open(`/ficha/${anamnesisForm.token}?modo=admin`, '_blank') }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -265,59 +220,63 @@ export default function PatientDetail() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Navbar */}
-      <nav className="bg-white border-b border-yellow-200 px-6 py-4 flex items-center gap-4 shadow-sm">
-        <button onClick={() => navigate('/')} className="text-gray-400 hover:text-yellow-600 transition">
+      <nav className="bg-white border-b border-yellow-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 shadow-sm">
+        <button onClick={() => navigate('/')} className="text-gray-400 hover:text-yellow-600 transition p-1 -ml-1">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="font-display text-xl text-yellow-600 font-bold">Callera Clinic</h1>
+        <h1 className="font-display text-lg sm:text-xl text-yellow-600 font-bold">Callera Clinic</h1>
       </nav>
 
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-3xl mx-auto px-4 py-5 sm:py-8 space-y-4 sm:space-y-6">
 
         {/* Card paciente */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-5">
-          <div className="relative flex-shrink-0">
-            {patient.photo_url ? (
-              <img src={patient.photo_url} alt={patient.name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-yellow-200" />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 font-display font-bold text-3xl">
-                {patient.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
+          <div className="flex items-start gap-3 sm:gap-5">
+            <div className="flex-shrink-0">
+              {patient.photo_url ? (
+                <img src={patient.photo_url} alt={patient.name}
+                  className="w-14 h-14 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-yellow-200" />
+              ) : (
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 font-display font-bold text-2xl sm:text-3xl">
+                  {patient.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-lg sm:text-2xl text-gray-700 leading-tight">{patient.name}</h2>
+              {patient.phone && <p className="text-sm text-gray-400 mt-0.5">{patient.phone}</p>}
+              {patient.email && <p className="text-xs text-gray-400 truncate">{patient.email}</p>}
+              <p className="text-xs text-gray-300 mt-1">Cadastrada em {new Date(patient.created_at).toLocaleDateString('pt-BR')}</p>
+            </div>
+            <button onClick={openEditModal}
+              className="flex-shrink-0 flex items-center gap-1 text-xs border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition">
+              <Pencil size={13} />
+              <span className="hidden sm:inline">Editar</span>
+            </button>
           </div>
-          <div className="flex-1">
-            <h2 className="font-display text-2xl text-gray-700">{patient.name}</h2>
-            <p className="text-sm text-gray-400 mt-0.5">{patient.phone} {patient.email && `· ${patient.email}`}</p>
-            <p className="text-xs text-gray-300 mt-1">Cadastrada em {new Date(patient.created_at).toLocaleDateString('pt-BR')}</p>
-          </div>
-          <button onClick={openEditModal}
-            className="flex items-center gap-1.5 text-xs border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-3 py-2 rounded-lg transition">
-            <Pencil size={13} /> Editar
-          </button>
         </div>
 
         {/* Ficha de anamnese */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-lg text-gray-700 flex items-center gap-2">
-              <FileText size={18} className="text-yellow-500" />
+            <h3 className="font-display text-base sm:text-lg text-gray-700 flex items-center gap-2">
+              <FileText size={16} className="text-yellow-500" />
               Ficha de Anamnese
             </h3>
             {anamnesisForm?.status === 'completed' ? (
               <span className="flex items-center gap-1 text-green-500 text-xs font-medium">
-                <CheckCircle size={14} /> Preenchida
+                <CheckCircle size={13} /> Preenchida
               </span>
             ) : (
               <span className="flex items-center gap-1 text-gray-300 text-xs font-medium">
-                <Clock size={14} /> Pendente
+                <Clock size={13} /> Pendente
               </span>
             )}
           </div>
 
           {anamnesisForm?.status === 'completed' ? (
             <div className="space-y-3">
-              <div className="bg-yellow-50 rounded-xl p-4 grid grid-cols-2 gap-2 text-sm">
+              <div className="bg-yellow-50 rounded-xl p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 {[
                   ['Nome', anamnesisForm.full_name],
                   ['Nascimento', anamnesisForm.birth_date],
@@ -330,7 +289,7 @@ export default function PatientDetail() {
                 ].map(([label, val]) => val ? (
                   <div key={label}>
                     <span className="text-gray-400 text-xs">{label}</span>
-                    <p className="text-gray-700">{val}</p>
+                    <p className="text-gray-700 text-sm break-words">{val}</p>
                   </div>
                 ) : null)}
               </div>
@@ -343,30 +302,30 @@ export default function PatientDetail() {
               {showAnswers && (
                 <div className="space-y-2 pt-2">
                   {questoes.map(q => answers[q.key] ? (
-                    <div key={q.key} className="flex justify-between text-sm border-b border-gray-50 pb-2">
-                      <span className="text-gray-500 flex-1">{q.label}</span>
-                      <span className="text-gray-700 font-medium ml-4">
+                    <div key={q.key} className="flex justify-between items-start text-sm border-b border-gray-50 pb-2 gap-3">
+                      <span className="text-gray-500 flex-1 text-xs sm:text-sm">{q.label}</span>
+                      <span className="text-gray-700 font-medium text-xs sm:text-sm text-right shrink-0">
                         {Array.isArray(answers[q.key]) ? answers[q.key].join(', ') : answers[q.key]}
                         {q.detail && answers[q.detail] ? ` — ${answers[q.detail]}` : ''}
                       </span>
                     </div>
                   ) : null)}
                   {(answers.q33_pressao || answers.q33_peso || answers.q33_altura) && (
-                    <div className="flex justify-between text-sm border-b border-gray-50 pb-2">
-                      <span className="text-gray-500">Pressão / Peso / Altura</span>
-                      <span className="text-gray-700 font-medium">{answers.q33_pressao} / {answers.q33_peso} / {answers.q33_altura}</span>
+                    <div className="flex justify-between text-sm border-b border-gray-50 pb-2 gap-3">
+                      <span className="text-gray-500 text-xs sm:text-sm">Pressão / Peso / Altura</span>
+                      <span className="text-gray-700 font-medium text-xs sm:text-sm">{answers.q33_pressao} / {answers.q33_peso} / {answers.q33_altura}</span>
                     </div>
                   )}
                   {answers.q44_dia && (
                     <div className="text-sm border-b border-gray-50 pb-2">
-                      <span className="text-gray-500">Rotina manhã</span>
-                      <p className="text-gray-700">{answers.q44_dia}</p>
+                      <span className="text-gray-500 text-xs">Rotina manhã</span>
+                      <p className="text-gray-700 text-xs sm:text-sm">{answers.q44_dia}</p>
                     </div>
                   )}
                   {answers.q44_noite && (
                     <div className="text-sm pb-2">
-                      <span className="text-gray-500">Rotina noite</span>
-                      <p className="text-gray-700">{answers.q44_noite}</p>
+                      <span className="text-gray-500 text-xs">Rotina noite</span>
+                      <p className="text-gray-700 text-xs sm:text-sm">{answers.q44_noite}</p>
                     </div>
                   )}
                 </div>
@@ -374,15 +333,15 @@ export default function PatientDetail() {
 
               <div className="flex flex-wrap gap-2 mt-2">
                 <button onClick={handlePrint}
-                  className="flex items-center gap-2 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition">
-                  <Printer size={15} /> Imprimir ficha
+                  className="flex items-center gap-1.5 text-xs sm:text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-3 py-2 rounded-lg transition">
+                  <Printer size={14} /> Imprimir
                 </button>
                 <button onClick={handleFillAsAdmin}
-                  className="flex items-center gap-2 text-sm border border-blue-200 text-blue-500 hover:bg-blue-50 px-4 py-2 rounded-lg transition">
-                  <Pencil size={15} /> Editar ficha
+                  className="flex items-center gap-1.5 text-xs sm:text-sm border border-blue-200 text-blue-500 hover:bg-blue-50 px-3 py-2 rounded-lg transition">
+                  <Pencil size={14} /> Editar ficha
                 </button>
                 <button onClick={handleReopenForm}
-                  className="flex items-center gap-2 text-sm border border-gray-200 text-gray-400 hover:bg-gray-50 px-4 py-2 rounded-lg transition">
+                  className="flex items-center gap-1.5 text-xs sm:text-sm border border-gray-200 text-gray-400 hover:bg-gray-50 px-3 py-2 rounded-lg transition">
                   Reabrir para paciente
                 </button>
               </div>
@@ -391,17 +350,17 @@ export default function PatientDetail() {
             <div className="space-y-2">
               <p className="text-sm text-gray-400">A paciente ainda não preencheu a ficha.</p>
               <button onClick={handleFillAsAdmin}
-                className="flex items-center gap-2 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition">
-                <Pencil size={15} /> Preencher ficha agora
+                className="flex items-center gap-1.5 text-sm border border-yellow-300 text-yellow-600 hover:bg-yellow-50 px-4 py-2 rounded-lg transition">
+                <Pencil size={14} /> Preencher ficha agora
               </button>
             </div>
           )}
         </div>
 
         {/* Sessões */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-lg text-gray-700">Histórico de Sessões</h3>
+            <h3 className="font-display text-base sm:text-lg text-gray-700">Histórico de Sessões</h3>
             <button onClick={() => setShowSessionModal(true)}
               className="flex items-center gap-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg transition">
               <Plus size={13} /> Nova sessão
@@ -411,44 +370,40 @@ export default function PatientDetail() {
           {sessions.length === 0 ? (
             <p className="text-sm text-gray-300">Nenhuma sessão registrada ainda.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {sessions.map(s => (
                 <div key={s.id} className="border border-gray-100 rounded-xl overflow-hidden">
-                  {/* Header da sessão */}
                   <button
                     onClick={() => toggleSession(s.id)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition text-left"
+                    className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition text-left"
                   >
-                    <div className="flex items-center gap-3">
-                      <p className="font-medium text-gray-700 text-sm">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <p className="font-medium text-gray-700 text-sm flex-shrink-0">
                         {new Date(s.session_date + 'T12:00:00').toLocaleDateString('pt-BR')}
                       </p>
                       {s.procedures && (
-                        <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full truncate">
                           {s.procedures.name}
                         </span>
                       )}
                     </div>
-                    <span className="text-gray-300 text-xs">
+                    <span className="text-gray-300 text-xs flex-shrink-0 ml-2">
                       {expandedSession === s.id ? '▲' : '▼'}
                     </span>
                   </button>
 
-                  {/* Detalhes expandidos */}
                   {expandedSession === s.id && (
-                    <div className="px-4 pb-4 space-y-3 border-t border-gray-50">
+                    <div className="px-3 sm:px-4 pb-4 space-y-3 border-t border-gray-50">
                       <div className="pt-3 space-y-1">
                         {s.how_arrived && <p className="text-xs text-gray-400">Como chegou: <span className="text-gray-600">{s.how_arrived}</span></p>}
                         {s.how_left && <p className="text-xs text-gray-400">Como saiu: <span className="text-gray-600">{s.how_left}</span></p>}
                         {s.observations && <p className="text-xs text-gray-400">Obs: <span className="text-gray-600">{s.observations}</span></p>}
                       </div>
-
-                      {/* Fotos antes/depois */}
                       <div>
                         <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                           <Image size={12} /> Fotos
                         </p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
                           {['antes', 'depois'].map(type => {
                             const photos = (sessionPhotosList[s.id] || []).filter(p => p.type === type)
                             return (
@@ -459,12 +414,12 @@ export default function PatientDetail() {
                                     {photos.map(photo => (
                                       <a key={photo.id} href={photo.file_url} target="_blank" rel="noreferrer">
                                         <img src={photo.file_url} alt={type}
-                                          className="w-full h-28 object-cover rounded-lg border border-gray-100 hover:opacity-90 transition" />
+                                          className="w-full h-24 sm:h-28 object-cover rounded-lg border border-gray-100 hover:opacity-90 transition" />
                                       </a>
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="w-full h-28 bg-gray-50 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
+                                  <div className="w-full h-24 sm:h-28 bg-gray-50 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
                                     <p className="text-xs text-gray-300">Sem foto</p>
                                   </div>
                                 )}
@@ -482,12 +437,12 @@ export default function PatientDetail() {
         </div>
 
         {/* Exames */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-lg text-gray-700">Exames</h3>
+            <h3 className="font-display text-base sm:text-lg text-gray-700">Exames</h3>
             <label className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition cursor-pointer text-white ${uploadingExam ? 'bg-yellow-400 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
               <Upload size={13} />
-              {uploadingExam ? 'Enviando...' : 'Anexar exame'}
+              {uploadingExam ? 'Enviando...' : 'Anexar'}
               <input type="file" className="hidden" onChange={handleExamUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" disabled={uploadingExam} />
             </label>
           </div>
@@ -495,7 +450,7 @@ export default function PatientDetail() {
           {examError && (
             <div className="mb-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-4 py-3 flex items-center justify-between">
               <span>{examError}</span>
-              <button onClick={() => setExamError(null)} className="ml-2 text-red-400 hover:text-red-600">✕</button>
+              <button onClick={() => setExamError(null)} className="ml-2 text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
             </div>
           )}
 
@@ -505,10 +460,10 @@ export default function PatientDetail() {
             <div className="space-y-2">
               {exams.map(exam => (
                 <a key={exam.id} href={exam.file_url} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-3 border border-gray-100 rounded-xl px-4 py-3 hover:border-yellow-200 transition">
+                  className="flex items-center gap-3 border border-gray-100 rounded-xl px-3 sm:px-4 py-3 hover:border-yellow-200 transition">
                   <FileText size={16} className="text-yellow-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-gray-700">{exam.file_name}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-700 truncate">{exam.file_name}</p>
                     <p className="text-xs text-gray-300">{new Date(exam.uploaded_at).toLocaleDateString('pt-BR')}</p>
                   </div>
                 </a>
@@ -520,21 +475,21 @@ export default function PatientDetail() {
 
       {/* Modal editar paciente */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-display text-2xl text-gray-700">Editar Paciente</h3>
-              <button onClick={() => setShowEditModal(false)} className="text-gray-300 hover:text-gray-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:px-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl p-6 sm:p-8 w-full sm:max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5 sm:mb-6">
+              <h3 className="font-display text-xl sm:text-2xl text-gray-700">Editar Paciente</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-300 hover:text-gray-500 p-1"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveEdit} className="space-y-4">
               <div className="flex justify-center mb-2">
                 <label className="cursor-pointer group relative">
-                  <div className="w-24 h-24 rounded-full border-2 border-dashed border-yellow-300 flex items-center justify-center bg-yellow-50 overflow-hidden group-hover:border-yellow-500 transition">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-dashed border-yellow-300 flex items-center justify-center bg-yellow-50 overflow-hidden group-hover:border-yellow-500 transition">
                     {photoPreview ? (
                       <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center">
-                        <Camera size={24} className="text-yellow-400 mx-auto" />
+                        <Camera size={22} className="text-yellow-400 mx-auto" />
                         <p className="text-xs text-yellow-400 mt-1">Foto</p>
                       </div>
                     )}
@@ -575,11 +530,11 @@ export default function PatientDetail() {
 
       {/* Modal nova sessão */}
       {showSessionModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-xl my-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-display text-2xl text-gray-700">Nova Sessão</h3>
-              <button onClick={() => setShowSessionModal(false)} className="text-gray-300 hover:text-gray-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:px-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl p-6 sm:p-8 w-full sm:max-w-md shadow-xl max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5 sm:mb-6">
+              <h3 className="font-display text-xl sm:text-2xl text-gray-700">Nova Sessão</h3>
+              <button onClick={() => setShowSessionModal(false)} className="text-gray-300 hover:text-gray-500 p-1"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveSession} className="space-y-4">
               <div>
@@ -616,8 +571,6 @@ export default function PatientDetail() {
                   rows={3}
                   className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-yellow-500 transition resize-none" />
               </div>
-
-              {/* Fotos antes/depois */}
               <div>
                 <label className="block text-sm text-gray-500 mb-2">Fotos antes / depois</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -625,24 +578,22 @@ export default function PatientDetail() {
                     <div key={type}>
                       <p className="text-xs text-gray-400 mb-1 capitalize">{type}</p>
                       <label className="cursor-pointer block">
-                        <div className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-yellow-300 transition">
+                        <div className="w-full h-24 sm:h-28 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-yellow-300 transition">
                           {sessionPhotosPreviews[type] ? (
                             <img src={sessionPhotosPreviews[type]} alt={type} className="w-full h-full object-cover" />
                           ) : (
                             <div className="text-center">
-                              <Camera size={20} className="text-gray-300 mx-auto" />
+                              <Camera size={18} className="text-gray-300 mx-auto" />
                               <p className="text-xs text-gray-300 mt-1">Adicionar</p>
                             </div>
                           )}
                         </div>
-                        <input type="file" accept="image/*" className="hidden"
-                          onChange={e => handleSessionPhotoChange(type, e)} />
+                        <input type="file" accept="image/*" className="hidden" onChange={e => handleSessionPhotoChange(type, e)} />
                       </label>
                     </div>
                   ))}
                 </div>
               </div>
-
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowSessionModal(false)}
                   className="flex-1 border border-gray-200 text-gray-400 py-3 rounded-lg text-sm hover:bg-gray-50 transition">Cancelar</button>
